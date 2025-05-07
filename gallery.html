@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Media Gallery</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+  <nav class="navbar">
+    <div class="nav-content">
+      <span class="nav-logo">📸 InstaMedia</span>
+      <div class="nav-links">
+        <a href="gallery.html">Gallery</a>
+        <a href="upload.html" id="uploadLink">Upload</a>
+        <a href="#" onclick="logout()">Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <h2>Interactive Media Wall</h2>
+
+  <form id="searchForm">
+    <input type="text" id="searchInput" placeholder="Search title, location, people...">
+    <button type="submit">Search</button>
+  </form>
+
+  <div class="gallery" id="gallery"></div>
+
+  <script>
+    const gallery = document.getElementById("gallery");
+    const form = document.getElementById("searchForm");
+    const searchInput = document.getElementById("searchInput");
+
+    function loadMedia(search = "") {
+      fetch("api/media.php?search=" + encodeURIComponent(search))
+        .then(res => res.json())
+        .then(data => {
+          gallery.innerHTML = "";
+
+          data.forEach(item => {
+            const div = document.createElement("div");
+            div.className = "item";
+
+            let mediaContent = "";
+            if (item.type === "image") {
+              mediaContent = `<img src="${item.filepath}" alt="${item.title}">`;
+            } else if (item.type === "video") {
+              const posterAttr = item.thumbnail ? `poster="${item.thumbnail}"` : "";
+              mediaContent = `
+                <video controls ${posterAttr}>
+                  <source src="${item.filepath}" type="video/mp4">
+                  Your browser does not support video.
+                </video>`;
+            }
+
+            div.innerHTML = `
+              ${mediaContent}
+              <div class="info">
+                <strong>${item.title}</strong>
+                <div class="meta">
+                  <em>📍 ${item.location}</em><br>
+                  👥 ${item.people}
+                </div>
+                <div class="caption">${item.caption}</div>
+                <div class="like-area" id="like-area-${item.id}" style="margin:10px 0;">Loading likes...</div>
+
+                <form class="comment-form" data-id="${item.id}">
+                  <textarea name="comment" rows="2" placeholder="Write a comment..."></textarea><br>
+                  ⭐ <input type="number" name="rating" min="1" max="5" style="width:50px;" required>
+                  <button type="submit">Submit</button>
+                </form>
+
+                <div class="comments" id="comments-${item.id}" style="margin-top:10px;">Loading comments...</div>
+              </div>
+              <div class="footer">🕓 ${new Date(item.uploaded_at).toLocaleString()}</div>
+            `;
+
+            gallery.appendChild(div);
+
+            loadComments(item.id);
+            loadLikes(item.id);
+
+            div.querySelector('.comment-form').addEventListener('submit', function(e) {
+              e.preventDefault();
+              const formData = new FormData(this);
+              formData.append("media_id", this.dataset.id);
+
+              fetch("api/comment.php", {
+                method: "POST",
+                body: formData
+              }).then(() => loadComments(this.dataset.id));
+            });
+          });
+        });
+    }
+
+    function loadComments(mediaId) {
+      fetch(`api/get_comments.php?media_id=${mediaId}`)
+        .then(res => res.json())
+        .then(data => {
+          const box = document.getElementById(`comments-${mediaId}`);
+          if (!data.length) {
+            box.innerHTML = `<div style="font-size: 13px; color: #999;">No comments yet.</div>`;
+            return;
+          }
+
+          const avg = data[0].avg_rating;
+          let html = `<div><span style="color: gold;">⭐</span> <strong>Avg Rating: ${avg ?? 'N/A'}</strong></div><br>`;
+
+          for (let i = 1; i < data.length; i++) {
+            const c = data[i];
+            html += `<div style="font-size: 13px; margin-bottom: 5px;">
+              <b style="color:#ddd;">${c.username}:</b>
+              <span id="comment-text-${c.id}" style="color:#ccc;">${c.comment}</span>
+              ${c.owned ? `
+                <button onclick="editComment(${c.id}, '${mediaId}')">Edit</button>
+                <button onclick="deleteComment(${c.id}, '${mediaId}')">Delete</button>` : ``}
+            </div>`;
+          }
+
+          box.innerHTML = html;
+        });
+    }
+
+    function editComment(commentId, mediaId) {
+      const span = document.getElementById(`comment-text-${commentId}`);
+      const newText = prompt("Edit your comment:", span.innerText);
+      if (newText && newText.trim() !== "") {
+        const formData = new FormData();
+        formData.append("comment_id", commentId);
+        formData.append("comment", newText.trim());
+
+        fetch("api/edit_comment.php", {
+          method: "POST",
+          body: formData
+        }).then(() => loadComments(mediaId));
+      }
+    }
+
+    function deleteComment(commentId, mediaId) {
+      if (confirm("Are you sure you want to delete this comment?")) {
+        const formData = new FormData();
+        formData.append("comment_id", commentId);
+
+        fetch("api/delete_comment.php", {
+          method: "POST",
+          body: formData
+        }).then(() => loadComments(mediaId));
+      }
+    }
+
+    function loadLikes(mediaId) {
+      fetch(`api/get_likes.php?media_id=${mediaId}`)
+        .then(res => res.json())
+        .then(data => {
+          const likeArea = document.getElementById(`like-area-${mediaId}`);
+          const liked = data.liked;
+          const count = data.count;
+
+          likeArea.innerHTML = `
+            <button class="like-btn" data-id="${mediaId}" style="border:none;background:none;cursor:pointer;font-size:16px;">
+              ${liked ? '❤️' : '🤍'} ${count} Likes
+            </button>
+          `;
+
+          likeArea.querySelector('.like-btn').addEventListener('click', () => {
+            const formData = new FormData();
+            formData.append("media_id", mediaId);
+
+            fetch("api/like.php", {
+              method: "POST",
+              body: formData
+            }).then(() => loadLikes(mediaId));
+          });
+        });
+    }
+
+    // Load all media on page load
+    loadMedia();
+
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      loadMedia(searchInput.value.trim());
+    });
+
+    function logout() {
+      fetch("api/logout.php").then(() => window.location.href = "login.html");
+    }
+
+    fetch("api/whoami.php")
+      .then(res => res.json())
+      .then(data => {
+        if (data.status !== "logged_in") {
+          window.location.href = "login.html";
+        } else if (data.role !== "creator") {
+          const uploadLink = document.getElementById("uploadLink");
+          if (uploadLink) uploadLink.style.display = "none";
+        }
+      });
+  </script>
+</body>
+</html>

@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Upload Media</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .form-container {
+      max-width: 500px;
+      margin: auto;
+      background: #181818;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 0 10px rgba(255,255,255,0.05);
+    }
+
+    .form-container h2 {
+      text-align: center;
+      color: #fff;
+      margin-bottom: 25px;
+    }
+
+    .form-container label {
+      display: block;
+      margin: 10px 0 5px;
+      font-weight: bold;
+      color: #ddd;
+    }
+
+    .form-container input,
+    .form-container textarea {
+      width: 100%;
+      padding: 12px;
+      border-radius: 10px;
+      background: #1e1e1e;
+      border: 1px solid #444;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .form-container button {
+      margin-top: 20px;
+      width: 100%;
+    }
+
+    #response {
+      text-align: center;
+      color: #bbb;
+      margin-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+<nav class="navbar">
+  <div class="nav-content">
+    <span class="nav-logo">📸 InstaMedia</span>
+    <div class="nav-links">
+      <a href="gallery.html">Gallery</a>
+      <a href="upload.html" id="uploadLink">Upload</a>
+      <a href="#" onclick="logout()">Logout</a>
+    </div>
+  </div>
+</nav>
+
+  <div class="form-container">
+    <h2>Upload Media</h2>
+    <form id="uploadForm">
+      <label>Title</label>
+      <input type="text" name="title" required>
+
+      <label>Caption</label>
+      <input type="text" name="caption" required>
+
+      <label>Location</label>
+      <input type="text" name="location" required>
+
+      <label>People</label>
+      <input type="text" name="people">
+
+      <label>Choose Media</label>
+      <input type="file" name="media" accept="image/*,video/*" required>
+
+      <label>Thumbnail (optional, for video preview)</label>
+      <input type="file" name="thumbnail" accept="image/*">
+
+      <button type="submit">Upload</button>
+    </form>
+    <div id="response"></div>
+  </div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+
+      const res = await fetch('api/upload.php', {
+        method: 'POST',
+        body: formData
+      });
+
+      const data = await res.json();
+      document.getElementById('response').innerText = data.message;
+    });
+  </script>
+
+  <script>
+    function logout() {
+      fetch("api/logout.php").then(() => window.location.href = "login.html");
+    }
+
+    fetch("api/whoami.php")
+      .then(res => res.json())
+      .then(data => {
+        if (data.status !== "logged_in") {
+          window.location.href = "login.html";
+        } else if (data.role !== "creator") {
+          const uploadLink = document.getElementById("uploadLink");
+          if (uploadLink) uploadLink.style.display = "none";
+        }
+      });
+  </script>
+
+</body>
+</html>
