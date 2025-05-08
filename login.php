@@ -28,7 +28,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['user_id'] = $id;
             $_SESSION['username'] = $username;
             $_SESSION['role'] = $role;
-            header("Location: dashboard.php");
+            header("Location: gallery.html");
             exit();
         } else {
             echo "❌ Password does not match.<br>";
